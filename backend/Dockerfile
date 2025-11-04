@@ -8,7 +8,7 @@ RUN npm install -g pnpm
 # 复制依赖文件
 COPY package.json ./
 
-# 安装依赖
+# 安装所有依赖（包括开发依赖）
 RUN pnpm install
 
 # 复制源代码
@@ -31,19 +31,27 @@ WORKDIR /usr/src/app
 # 安装 pnpm
 RUN npm install -g pnpm
 
-# 复制依赖文件
+# 复制依赖文件和 Prisma schema
 COPY package.json ./
+COPY prisma ./prisma
 
-# 只安装生产依赖
+# 先安装生产依赖
 RUN pnpm install --prod
 
-# 从构建阶段复制编译后的代码和 Prisma Client
+# 安装 prisma CLI（用于运行迁移）
+RUN pnpm add prisma
+
+# 设置环境变量
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
+# 生成 Prisma Client（在生产环境中）
+RUN pnpm prisma generate
+
+# 从构建阶段复制编译后的代码
 COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /usr/src/app/prisma ./prisma
 
 # 暴露端口
 EXPOSE 3001
 
 # 启动命令（包含数据库迁移）
-CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/src/main"]

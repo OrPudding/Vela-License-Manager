@@ -29,13 +29,13 @@
         :search="search"
         class="elevation-1"
       >
-        <template #item.status="{ item }">
+        <template #item.status="{ item }: { item: License }">
           <v-chip :color="getStatusColor(item.status)" size="small">
             {{ getStatusText(item.status) }}
           </v-chip>
         </template>
 
-        <template #item.actions="{ item }">
+        <template #item.actions="{ }">
           <v-btn icon size="small" variant="text">
             <v-icon>mdi-pencil</v-icon>
           </v-btn>
@@ -53,7 +53,13 @@ import { ref, onMounted } from 'vue'
 
 const search = ref('')
 const loading = ref(false)
-const licenses = ref([])
+interface License {
+  id: number
+  status: string
+  [key: string]: any
+}
+
+const licenses = ref<License[]>([])
 
 const headers = [
   { title: 'ID', key: 'id' },
@@ -65,7 +71,7 @@ const headers = [
   { title: '操作', key: 'actions', sortable: false },
 ]
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
     active: 'success',
     pending: 'warning',
@@ -75,7 +81,7 @@ const getStatusColor = (status: string) => {
   return colors[status] || 'grey'
 }
 
-const getStatusText = (status: string) => {
+const getStatusText = (status: string): string => {
   const texts: Record<string, string> = {
     active: '已激活',
     pending: '待激活',
