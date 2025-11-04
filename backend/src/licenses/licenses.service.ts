@@ -203,7 +203,7 @@ export class LicensesService {
         details: {
           licenseId: id,
           changes: updateLicenseDto,
-        },
+        } as any,
       },
     });
 

@@ -6,13 +6,16 @@ WORKDIR /usr/src/app
 RUN npm install -g pnpm
 
 # 复制依赖文件
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 
 # 安装依赖
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # 复制源代码
 COPY . .
+
+# 设置构建时的占位符环境变量（Prisma 生成客户端时需要）
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
 # 生成 Prisma Client
 RUN pnpm prisma generate
@@ -29,10 +32,10 @@ WORKDIR /usr/src/app
 RUN npm install -g pnpm
 
 # 复制依赖文件
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 
 # 只安装生产依赖
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod
 
 # 从构建阶段复制编译后的代码和 Prisma Client
 COPY --from=builder /usr/src/app/dist ./dist

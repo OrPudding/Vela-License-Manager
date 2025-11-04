@@ -50,9 +50,9 @@ check_os() {
     fi
 }
 
-# 生成随机密钥
+# 生成随机密钥（删除换行符）
 generate_secret() {
-    openssl rand -base64 $1
+    openssl rand -base64 $1 | tr -d '\n'
 }
 
 # 主函数
@@ -94,17 +94,8 @@ main() {
         fi
     fi
 
-    # 这里假设代码已经在 GitHub 上，实际部署时需要替换为真实的仓库地址
-    # git clone https://github.com/your-username/vela-license-manager.git "$INSTALL_DIR"
-    
-    # 临时方案：如果在本地开发，直接复制
-    if [ -d "/home/ubuntu/vela-license-manager" ]; then
-        cp -r /home/ubuntu/vela-license-manager "$INSTALL_DIR"
-        print_success "源代码已复制到 $INSTALL_DIR"
-    else
-        print_error "源代码不存在，请先克隆仓库"
-        exit 1
-    fi
+    git clone https://github.com/OrPudding/Vela-License-Manager.git "$INSTALL_DIR"
+    print_success "源代码已下载到 $INSTALL_DIR"
 
     cd "$INSTALL_DIR"
 
@@ -119,10 +110,10 @@ main() {
         JWT_SECRET=$(generate_secret 64)
         MASTER_KEY=$(generate_secret 32)
         
-        # 替换环境变量
-        sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${DB_PASSWORD}/" .env
-        sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
-        sed -i "s/MASTER_ENCRYPTION_KEY=.*/MASTER_ENCRYPTION_KEY=${MASTER_KEY}/" .env
+        # 替换环境变量（使用 printf 和文件重写更安全）
+        sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${DB_PASSWORD}|" .env
+        sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${JWT_SECRET}|" .env
+        sed -i "s|^MASTER_ENCRYPTION_KEY=.*|MASTER_ENCRYPTION_KEY=${MASTER_KEY}|" .env
         
         print_success "环境变量已配置"
     else

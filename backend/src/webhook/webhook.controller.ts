@@ -2,7 +2,7 @@ import { Controller, Post, Body, Get, Query, UseGuards } from '@nestjs/common';
 import { WebhookService } from './webhook.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AfdianWebhookPayload } from './dto/afdian.dto';
+import type { AfdianWebhookPayload } from './dto/afdian.dto';
 
 @Controller('webhook')
 export class WebhookController {
