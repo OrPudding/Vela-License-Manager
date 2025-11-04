@@ -1,0 +1,225 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 系统管理员和权限模型
+// ============================================
+
+model Admin {
+  id         Int         @id @default(autoincrement())
+  username   String      @unique
+  password   String      // bcrypt 哈希
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  
+  roles      AdminRole[]
+  auditLogs  AuditLog[]
+  
+  @@map("admins")
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  
+  admins      AdminRole[]
+  permissions RolePermission[]
+  
+  @@map("roles")
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  action      String           @unique // 如: "product:create", "license:delete"
+  description String?
+  
+  roles       RolePermission[]
+  
+  @@map("permissions")
+}
+
+// 管理员-角色 多对多关系表
+model AdminRole {
+  adminId   Int
+  roleId    Int
+  
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@id([adminId, roleId])
+  @@map("admin_roles")
+}
+
+// 角色-权限 多对多关系表
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// 产品和用户模型
+// ============================================
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  description  String?
+  cloudConfig  Json     @default("{}")  // 云控配置
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  licenses     License[]
+  orders       Order[]
+  announcements Announcement[]
+  
+  @@map("products")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  deviceId        String?  @unique  // 设备ID（兼容旧版）
+  email           String?  @unique
+  afdianUserId    String?  @unique  // 爱发电用户ID
+  balance         Decimal  @default(0.00) @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  licenses        License[]
+  orders          Order[]
+  
+  @@map("users")
+}
+
+// ============================================
+// 许可证模型
+// ============================================
+
+model License {
+  id           Int       @id @default(autoincrement())
+  productId    Int
+  userId       Int
+  licenseType  String    // 'permanent', 'subscription', 'balance'
+  status       String    @default("pending") // 'pending', 'active', 'expired', 'revoked'
+  activatedAt  DateTime?
+  expiresAt    DateTime? // 订阅制的到期时间
+  deviceInfo   Json?     // 客户端上报的设备信息
+  keyId        Int?      // 用于签发此许可证的密钥ID
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  product      Product   @relation(fields: [productId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
+  
+  @@map("licenses")
+}
+
+// ============================================
+// 订单模型（爱发电）
+// ============================================
+
+model Order {
+  id             Int      @id @default(autoincrement())
+  outTradeNo     String   @unique  // 爱发电订单号
+  productId      Int
+  userId         Int
+  licenseId      Int?
+  
+  afdianUserId   String   // 爱发电用户ID
+  planId         String?  // 爱发电方案ID
+  totalAmount    Decimal  @db.Decimal(10, 2)
+  status         Int      // 订单状态（2为成功）
+  remark         String?  // 订单备注（设备ID）
+  
+  rawData        Json     // 完整的爱发电订单数据
+  createdAt      DateTime @default(now())
+  
+  product        Product  @relation(fields: [productId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
+  
+  @@map("orders")
+}
+
+// ============================================
+// 公告模型
+// ============================================
+
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  productId   Int?      // NULL 表示全局公告
+  title       String
+  content     String    @db.Text
+  isPublished Boolean   @default(false)
+  publishAt   DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  product     Product?  @relation(fields: [productId], references: [id])
+  
+  @@map("announcements")
+}
+
+// ============================================
+// 密钥管理模型
+// ============================================
+
+model EncryptionKey {
+  id         Int      @id @default(autoincrement())
+  publicKey  String   @db.Text
+  privateKey String   @db.Text  // 将被加密存储
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  
+  @@map("encryption_keys")
+}
+
+// ============================================
+// 操作日志模型
+// ============================================
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int?
+  action     String
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  
+  admin      Admin?   @relation(fields: [adminId], references: [id])
+  
+  @@map("audit_logs")
+}
+
+// ============================================
+// 系统设置模型
+// ============================================
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_settings")
+}

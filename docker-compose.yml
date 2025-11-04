@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: vela-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vela}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vela_password}
+      POSTGRES_DB: ${POSTGRES_DB:-vela_license}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vela-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vela}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端 API 服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vela-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vela}:${POSTGRES_PASSWORD:-vela_password}@postgres:5432/${POSTGRES_DB:-vela_license}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}
+      AFDIAN_USER_ID: ${AFDIAN_USER_ID:-}
+      AFDIAN_API_TOKEN: ${AFDIAN_API_TOKEN:-}
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-production}
+      OOBE_COMPLETED: ${OOBE_COMPLETED:-false}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vela-network
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+
+  # 前端 Web UI 服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vela-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - vela-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  vela-network:
+    driver: bridge
